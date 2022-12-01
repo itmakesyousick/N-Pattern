@@ -1,17 +1,18 @@
 // This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
 // © boitoki
 
-//@version=4
-study("N Pattern", "N-Pattern", overlay=true, max_lines_count=200, max_labels_count=200, max_boxes_count=200, max_bars_back=500)
+//@version=5
+indicator('N Pattern', 'N-Pattern', overlay=true, max_lines_count=500, max_labels_count=500, max_boxes_count=500, max_bars_back=500)
 
 ///////////////////
 // Inputs
 ///////////////////
-MY_ATR = atr(16)
-EMOJI_BULL = "🐮"
-EMOJI_BEAR = "🐻"
-EMOJI_V = "✅"
-EMOJI_X = "❌"
+MT_ATR_LENGTH = 10
+MY_ATR = ta.atr(MT_ATR_LENGTH)
+EMOJI_BULL = '🐮'
+EMOJI_BEAR = '🐻'
+EMOJI_V = '✅'
+EMOJI_X = '❌'
 P = 9
 A = 0
 B = 1
@@ -20,50 +21,86 @@ D = 3
 OP = 4
 COP = 5
 XOP = 6
+E = 7  // Entry zone
+A_INDEX_NOT_CHANGED = 0
+B_INDEX_NOT_CHANGED = 1
 
-rightbar = input(1, "Pivot Right bar", group="Basic", minval=1)
-leftbar = input(10, "Pivot Left bar", group="Basic", minval=1)
-lookback = input(100, "Lookback", group="Basic", minval=10)
-nearest_count = input(30, "Nearest bars count", group="Basic", minval=0, tooltip="Hide if too near.")
-valid_bc = input(80, "Valid BC volume/%", group="Basic", step=1, minval=0, tooltip="`(BC / AB * 100) <= X%` is valid")
-valid_ab = input(5, "Valid AB volume/ATR", group="Basic", tooltip="`AB >= ATR*X` is valid")
-valid_ab_loger = input(300, "Valid AB longer", group="Basic", minval=0, tooltip="`AB / BC * 100 < X` is valid")
-a_threshold = input(0.0, "A Point Threshold/ATR", group="Basic", minval=0, step=0.1) * MY_ATR
-show_sides = input("Both", "Limit the display side", options=["Both", "Bull only", "Bear only"], group="Basic")
-show_history = input(false, "Show History", group="Basic")
-show_pivot = input(false, "Show Pivots", group="Basic")
+// Basic
+// ====================
+rightbar = input.int(1, 'Pivot Right bar', group='Basic', minval=1)
+leftbar = input.int(7, 'Pivot Left bar', group='Basic', minval=1)
+lookback = input.int(100, 'Lookback', group='Basic', minval=10)
+nearest_count = input.int(1, 'Nearest bars count', group='Basic', minval=0, tooltip='Hide if too near.')
+show_sides = input.string('Both', 'Limit the display side', options=['Both', 'Bull only', 'Bear only'], group='Basic')
+show_history = input.bool(false, 'Show History', group='Basic')
 show_nearest = nearest_count == 0
-show_op  = input(true, "Objective Point (OP)", group="Objectives", tooltip="OP = (B - A) + C")
-show_cop = input(false, "Contracted Objective Point (COP)", group="Objectives", tooltip="COP = 0.618 * (B - A) + C")
-show_xop = input(false, "Expanded Objective Point (XOP)", group="Objectives", tooltip="XOP = 1.618 * (B - A) + C")
-show_sr = input(true, "Show Support/Resistance", group="Support/Resistance")
-show_srHistory = input(false, "History of Support/Resistance", group="Support/Resistance")
-line_SR_width = input(2, "Line SR width", group="Support/Resistance")
-line_SR_style = input(line.style_dashed, "Line SR style", options=[line.style_dashed, line.style_dotted, line.style_solid, line.style_arrow_right], group="Support/Resistance")
-line_SR_length = input(1.618, "Line SR length", step=0.01, group="Support/Resistance")
 
-show_fib = input(false, "Show Fibonacci lines", group="Fibonacci")
-show_fibhistory = input(false, "History of Fibonacci lines", group="Fibonacci")
+// Validation
+// ===================
+valid_bc = input.int(80, 'Valid BC volume/%', group='Validation', step=1, minval=0, tooltip='`(BC / AB * 100) <= X%` is valid') / 100
+valid_ab = input.int(5, 'Valid AB volume/ATR', group='Validation', tooltip='`AB >= ATR*X` is valid')
+valid_ab_loger = input.int(500, 'Valid AB longer', group='Validation', minval=0, tooltip='`AB / BC * 100 < X` is valid') / 100
+a_threshold = input.float(0.0, 'A Point Threshold/ATR', group='Validation', minval=0, step=0.1) * MY_ATR
 
-show_zone = input(false, "Show C Zone", group="C Zone")
-show_zonehistory = input(false, "History of C Zone", group="C Zone")
+// Styles
+// ====================
+line_A_width = input.int(2, 'A-B line width', group='Styles', minval=1)
+line_B_width = input.int(4, 'B-C line width', group='Styles', minval=1)
+line_C_width = input.int(1, 'C-D line width', group='Styles', minval=1)
+line_C_style = input.string(line.style_dotted, 'C-D line Style', group='Styles', options=[line.style_dotted, line.style_dashed, line.style_solid, line.style_arrow_right])
+colorBull = input.color(#3cad99, 'Color bull', group='Styles')
+colorBear = input.color(#e0457f, 'Color bear', group='Styles')
 
-show_label_a = input(false, "Label A", group="Labels")
-show_label_b = input(false, "Label B", group="Labels")
-show_label_c = input(true, "Label C", group="Labels")
-show_label_p = input(false, "Label P", group="Labels")
-label_c_bull = input("C", "C Label (Bull)", options=["C", "Buy", "Bull", "Long", "L", EMOJI_BULL], group="Labels")
-label_c_bear = input("C", "C Label (Bear)", options=["C", "Sell", "Bear", "Short", "S", EMOJI_BEAR], group="Labels")
-show_label_op = input(false, "Label OP", group="Labels")
-show_label_cop = input(false, "Label COP", group="Labels")
-show_label_xop = input(false, "Label XOP", group="Labels")
+// Objectives
+// ====================
+show_op = input.bool(true, 'Objective Point (OP)', group='Objectives', tooltip='OP = (B - A) + C')
+show_cop = input.bool(false, 'Contracted Objective Point (COP)', group='Objectives', tooltip='COP = 0.618 * (B - A) + C')
+show_xop = input.bool(false, 'Expanded Objective Point (XOP)', group='Objectives', tooltip='XOP = 1.618 * (B - A) + C')
 
-line_A_width = input(3, "A-B line width", group="Styles", minval=1)
-line_B_width = input(6, "B-C line width", group="Styles", minval=1)
-line_C_width = input(2, "C-D line width", group="Styles", minval=1)
-line_C_style = input(line.style_dotted, "C-D line Style", group="Styles", options=[line.style_dotted, line.style_dashed, line.style_solid, line.style_arrow_right])
-colorBull = input(#3cad99, "Color bull", group="Styles")
-colorBear = input(#e0457f, "Color bear", group="Styles")
+// P point
+// ====================
+P_IS = input.string('Yes', 'Point P', options=['Yes', 'P with Support/Resistance', 'No'], group='P point')
+show_cp = input.string('Yes', "P-C", options=['Yes', 'No'], group="P point") == 'Yes'
+show_p = P_IS != 'No'
+show_pb = P_IS == 'P with Support/Resistance'
+
+// Support/Resistance
+// ====================
+show_sr = input.bool(true, 'Show Support/Resistance', group='Support/Resistance')
+show_srHistory = show_history
+line_SR_width = input.int(1, 'Line SR width', group='Support/Resistance')
+line_SR_style = input.string(line.style_dashed, 'Line SR style', options=[line.style_dashed, line.style_dotted, line.style_solid, line.style_arrow_right], group='Support/Resistance')
+line_SR_length = input.float(1.618, 'Line SR length', step=0.01, group='Support/Resistance')
+
+// Fibonacci
+// ====================
+show_fib = input.bool(false, 'Show Fibonacci lines', group='Fibonacci')
+show_fibhistory = show_history
+
+// Pullbacks entry zone
+// ====================
+show_zone = input.bool(false, 'Show Pullbacks line', group='Pullbacks')
+show_zonehistory = show_history
+zone_label = 'TRADING'
+
+// Labels
+// ====================
+show_label_a = input.bool(true, 'Label A', group='Labels')
+show_label_b = input.bool(true, 'Label B', group='Labels')
+show_label_c = input.bool(true, 'Label C', group='Labels')
+show_label_p = input.bool(false, 'Label P', group='Labels')
+label_c_bull = input.string('C', 'C Label (Bull)', options=['C', 'Buy', 'Bull', 'Long', 'L', EMOJI_BULL], group='Labels')
+label_c_bear = input.string('C', 'C Label (Bear)', options=['C', 'Sell', 'Bear', 'Short', 'S', EMOJI_BEAR], group='Labels')
+show_label_op = input.bool(true, 'Label OP', group='Labels')
+show_label_cop = input.bool(false, 'Label COP', group='Labels')
+show_label_xop = input.bool(false, 'Label XOP', group='Labels')
+
+
+// Options
+// ====================
+TRIGGER_OFFSET = input.string('No', 'Re-Paint', options=['Yes', 'No'], group='Options') == 'Yes' ? 0 : 1
+DEBUG = input.string('No', 'Debug Messages', options=['Yes', 'No'], group='Options') == 'Yes' ? true : false
+show_pivot = input.bool(false, 'Show Pivots', group='Options')
 
 ///////////////////
 // Defined
@@ -71,28 +108,32 @@ colorBear = input(#e0457f, "Color bear", group="Styles")
 my_linestyle = line.style_solid
 noneColor = color.new(color.black, 100)
 
-TRIGGER_OFFSET = input("No", "Re-Paint", options=["Yes", "No"], group="Options") == "Yes" ? 0 : 1
-DEBUG = input("No", "Debug Messages", options=["Yes", "No"], group="Options") == "Yes" ? true : false
-P_IS = input("No", "Point P", options=["P Only", "P with Support/Resistance", "No"], group="Options")
-show_p  = P_IS != "No"
-show_pb = P_IS == "P with Support/Resistance"
 
 ///////////////////
 // Functions
 ///////////////////
-valify_AB (a, b) => abs(a - b) >= (MY_ATR * valid_ab)
+validate_index(i) =>
+    i > 0 and not na(i)
 
-valify_BC (a, b, c) => 
-    if (valid_bc == 0)
+validate_ab_longer(a, b, c) =>
+    (math.abs(b - a) / math.abs(c - b)) < valid_ab_loger
+
+validate_ab(a, b) =>
+    math.abs(a - b) >= MY_ATR * valid_ab
+
+validate_bc(a, b, c) =>
+    if valid_bc == 0
         true
-    else 
-        ((abs(c - b) / abs(a - b)) * 100) <= valid_bc
+    else
+        (math.abs(c - b) / math.abs(a - b)) <= valid_bc
 
-get_xtime_by_bar (bar_count) => (timeframe.multiplier * bar_count * 60 * 1000)
+get_xtime_by_bar(bar_count) =>
+    timeframe.multiplier * bar_count * 60 * 1000
 
-get_c_time () => time - get_xtime_by_bar(rightbar + TRIGGER_OFFSET)
+get_c_time() =>
+    time - get_xtime_by_bar(rightbar + TRIGGER_OFFSET)
 
-draw_fibonacci (index_list, price_list, my_linecolor, should_delete_history) =>
+draw_fibonacci(index_list, price_list, my_linecolor, should_delete_history) =>
     x = array.get(index_list, A)
     a_price = array.get(price_list, A)
     b_price = array.get(price_list, B)
@@ -109,36 +150,37 @@ draw_fibonacci (index_list, price_list, my_linecolor, should_delete_history) =>
     line_fib_0786 = line.new(x, f8, bar_index, f8, width=1, color=color.new(my_linecolor, 30), style=line.style_dotted)
     line_fib_0236 = line.new(x, f2, bar_index, f2, width=1, color=color.new(my_linecolor, 30), style=line.style_dotted)
 
-    if (should_delete_history) or not show_fibhistory
+    if should_delete_history or not show_fibhistory
         line.delete(line_fib_0500[1])
         line.delete(line_fib_0382[1])
         line.delete(line_fib_0618[1])
         line.delete(line_fib_0786[1])
         line.delete(line_fib_0236[1])
 
-draw_sr (index_list, price_list, my_linecolor, should_delete_history) =>
+draw_sr(index_list, price_list, my_linecolor, should_delete_history) =>
     a_index = array.get(index_list, A)
     b_index = array.get(index_list, B)
     c_index = array.get(index_list, C)
     b_price = array.get(price_list, B)
 
     start_offset = TRIGGER_OFFSET + rightbar
-    ab = abs(b_index - a_index)
-    bc = abs(c_index - b_index)
-    x1 = time - get_xtime_by_bar(abs(c_index - b_index + start_offset))
-    x2 = time + get_xtime_by_bar(round(max(ab, bc) * line_SR_length))
+    ab = math.abs(b_index - a_index)
+    bc = math.abs(c_index - b_index)
+    ac = math.abs(c_index - a_index)
+    x1 = time - get_xtime_by_bar(math.abs(c_index - b_index + start_offset))
+    x2 = time + get_xtime_by_bar(math.round(ac * line_SR_length))
 
     line my_line = line.new(x1, b_price, x2, b_price, style=line_SR_style, color=my_linecolor, width=line_SR_width, xloc=xloc.bar_time)
-    
-    if (should_delete_history) or not show_srHistory
+
+    if should_delete_history or not show_srHistory
         line.delete(my_line[1])
 
-draw_labels (index_list, price_list, col, should_delete_history, direction) => 
+draw_labels(index_list, price_list, col, should_delete_history, direction) =>
     a_index = array.get(index_list, A)
     b_index = array.get(index_list, B)
     c_index = array.get(index_list, C)
     p_index = array.get(index_list, P)
-    d_time  = array.get(index_list, D)
+    d_time = array.get(index_list, D)
 
     a_price = array.get(price_list, A)
     b_price = array.get(price_list, B)
@@ -149,24 +191,24 @@ draw_labels (index_list, price_list, col, should_delete_history, direction) =>
     xop_price = array.get(price_list, XOP)
 
     label_a_style = direction == 1 ? label.style_label_up : label.style_label_down
-    label label_a = show_label_a ? label.new(a_index, a_price, "A", style=label_a_style, color=noneColor, textcolor=col, size=size.normal) : na
-    
+    label label_a = show_label_a ? label.new(a_index, a_price, 'A', style=label_a_style, color=noneColor, textcolor=col, size=size.normal) : na
+
     label_b_style = direction == 1 ? label.style_label_down : label.style_label_up
-    label label_b = show_label_b ? label.new(b_index, b_price, "B", style=label_b_style, color=noneColor, textcolor=col, size=size.normal) : na
+    label label_b = show_label_b ? label.new(b_index, b_price, 'B', style=label_b_style, color=noneColor, textcolor=col, size=size.normal) : na
 
     label_p_style = direction == 1 ? label.style_label_down : label.style_label_up
-    label label_p = show_label_p ? label.new(p_index, p_price, "P", style=label_p_style, color=noneColor, textcolor=col, size=size.normal) : na
-        
+    label label_p = show_label_p ? label.new(p_index, p_price, 'P', style=label_p_style, color=noneColor, textcolor=col, size=size.normal) : na
+
     label_c_style = direction == 1 ? label.style_label_up : label.style_label_down
     label_c_text = direction == 1 ? label_c_bull : label_c_bear
     label label_c = show_label_c ? label.new(c_index, c_price, label_c_text, style=label_c_style, color=col, textcolor=color.white, size=size.small) : na
 
     label_op_style = label.style_label_left
-    label label_op  = show_label_op  ? label.new(d_time,  op_price,  "OP", style=label_op_style, color=noneColor, textcolor=col, xloc=xloc.bar_time, size=size.normal) : na
-    label label_cop = show_label_cop ? label.new(d_time, cop_price, "COP", style=label_op_style, color=noneColor, textcolor=col, xloc=xloc.bar_time, size=size.normal) : na
-    label label_xop = show_label_xop ? label.new(d_time, xop_price, "XOP", style=label_op_style, color=noneColor, textcolor=col, xloc=xloc.bar_time, size=size.normal) : na
-    
-    if (should_delete_history) or not show_history
+    label label_op = show_label_op ? label.new(d_time, op_price, 'OP', style=label_op_style, color=noneColor, textcolor=col, xloc=xloc.bar_time, size=size.normal) : na
+    label label_cop = show_label_cop ? label.new(d_time, cop_price, 'COP', style=label_op_style, color=noneColor, textcolor=col, xloc=xloc.bar_time, size=size.normal) : na
+    label label_xop = show_label_xop ? label.new(d_time, xop_price, 'XOP', style=label_op_style, color=noneColor, textcolor=col, xloc=xloc.bar_time, size=size.normal) : na
+
+    if should_delete_history or not show_history
         label.delete(label_a[1])
         label.delete(label_b[1])
         label.delete(label_c[1])
@@ -175,21 +217,53 @@ draw_labels (index_list, price_list, col, should_delete_history, direction) =>
         label.delete(label_cop[1])
         label.delete(label_xop[1])
 
-draw_zone (index_list, price_list, my_linecolor, should_delete_history, direction) =>
+draw_pullbacks(index_list, price_list, my_linecolor, should_delete_history, direction) =>
     c_index = array.get(index_list, C)
     c_price = array.get(price_list, C)
-    
+
     x1 = get_c_time()
-    x2 = array.get(index_list, D)
-    y1 = c_price + (MY_ATR * 0.4)
-    y2 = c_price - (MY_ATR * 0.4)
-    my_box = box.new(x1, y1, x2, y2, border_color=noneColor, bgcolor=color.new(my_linecolor, 75), xloc=xloc.bar_time)
-    
+    x2 = array.get(index_list, E)
+    x3 = (math.abs(x2 - x1) / 2) + x1
+    y1 = c_price + MY_ATR * (direction == 1 ? 0.0 : 0.4)
+    y2 = c_price - MY_ATR * (direction == 1 ? 0.4 : 0.0)
+    y3 = (math.abs(y1 - y2) / 2) + y2
+    my_box = box.new(x1, y1, x2, y2, border_color=noneColor, bgcolor=color.new(my_linecolor, 76), xloc=xloc.bar_time)
+    my_labelyloc = direction == 1 ? yloc.belowbar : yloc.abovebar
+    my_labeltext = direction == 1 ? "BUY" : "SELL"
+    my_label = label.new(x3, y2, zone_label, textcolor=color.new(my_linecolor, 20), xloc=xloc.bar_time, size=size.normal, style=label.style_none)
+
     if should_delete_history or not show_zonehistory
         box.delete(my_box[1])
-    
+        label.delete(my_label[1])
 
-draw (index_list, price_list, found_list, my_linecolor, should_delete_history, direction) =>
+draw_past(index_list, price_list, my_linecolor, should_delete_history, direction) =>
+    a_index = array.get(index_list, A)
+    c_index = array.get(index_list, C)
+    p_index = array.get(index_list, P)
+    a_price = array.get(price_list, A)
+    c_price = array.get(price_list, C)
+    p_price = array.get(price_list, P)
+    p_index_valid = validate_index(p_index)
+    my_color = (direction == 1 and p_price > c_price or direction == -1 and p_price < c_price) ? color.yellow : my_linecolor
+    my_color := my_linecolor
+
+    line line_pa = show_p  and p_index_valid ? line.new(p_index, p_price, a_index, a_price, style=line.style_dotted, color=color.new(my_color, 30), width=2) : na
+    line line_pb = show_pb and p_index_valid ? line.new(p_index, p_price, a_index, p_price, style=line.style_dashed, color=color.new(my_color, 30), width=1) : na
+    line line_cp = show_cp and p_index_valid ? line.new(p_index, c_price, c_index, c_price, style=line.style_dotted, color=color.new(my_linecolor, 30), width=2) : na
+
+    box box_pa = na
+
+    if show_pb and p_index_valid
+        box_pa := box.new(p_index, a_price, a_index, p_price, bgcolor=color.new(my_color, 86), border_color=noneColor, border_style=line.style_dashed)
+        box_pa
+
+    if should_delete_history or not show_history
+        line.delete(line_pa[1])
+        line.delete(line_pb[1])
+        line.delete(line_cp[1])
+        box.delete(box_pa[1])
+
+draw(index_list, price_list, found_list, flags_list, my_linecolor, should_delete_history, direction) =>
     a_price = array.get(price_list, A)
     b_price = array.get(price_list, B)
     c_price = array.get(price_list, C)
@@ -201,92 +275,112 @@ draw (index_list, price_list, found_list, my_linecolor, should_delete_history, d
     b_index = array.get(index_list, B)
     c_index = bar_index - (rightbar + TRIGGER_OFFSET)
     p_index = array.get(index_list, P)
-    
+
     a_b = b_index - a_index
     b_c = c_index - b_index
-    a_b_ratio = (a_b / b_c * 100)
+    a_b_ratio = a_b / b_c * 100
 
-    is_valid_bc = valify_BC(a_price, b_price, c_price)
-    is_valid_ab = valify_AB(a_price, b_price)
-    is_valid_ab_ratio = a_b_ratio < valid_ab_loger
+    op_price = math.abs(a_price - b_price) * 1.000 * direction + c_price
+    cop_price = math.abs(a_price - b_price) * 0.618 * direction + c_price
+    xop_price = math.abs(a_price - b_price) * 1.618 * direction + c_price
 
-    if (a_found and b_found) and is_valid_bc and is_valid_ab and is_valid_ab_ratio
-        op_price  = (abs(a_price - b_price) * 1.000 * direction) + c_price
-        cop_price = (abs(a_price - b_price) * 0.618 * direction) + c_price
-        xop_price = (abs(a_price - b_price) * 1.618 * direction) + c_price
+    c_time = get_c_time()
+    d_time = time + get_xtime_by_bar(math.abs(a_index - b_index))
+    e_time = time + get_xtime_by_bar(math.abs(b_index - c_index))
 
-        c_time = get_c_time()
-        d_time = time + get_xtime_by_bar(abs(a_index - b_index))
+    line line_ab = line.new(a_index, a_price, b_index, b_price, style=my_linestyle, color=my_linecolor, width=line_A_width)
+    line line_bc = line.new(b_index, b_price, c_index, c_price, style=my_linestyle, color=my_linecolor, width=line_B_width)
+    line line_c_op = show_op ? line.new(c_time, c_price, d_time, op_price, style=line_C_style, color=my_linecolor, width=line_C_width, xloc=xloc.bar_time) : na
+    line line_c_cop = show_cop ? line.new(c_time, c_price, d_time, cop_price, style=line_C_style, color=my_linecolor, width=line_C_width, xloc=xloc.bar_time) : na
+    line line_c_xop = show_xop ? line.new(c_time, c_price, d_time, xop_price, style=line_C_style, color=my_linecolor, width=line_C_width, xloc=xloc.bar_time) : na
 
-        line line_ab = line.new(a_index, a_price, b_index, b_price, style=my_linestyle, color=my_linecolor, width=line_A_width)
-        line line_bc = line.new(b_index, b_price, c_index, c_price, style=my_linestyle, color=my_linecolor, width=line_B_width)
-        line line_pa = show_p  ? line.new(p_index, p_price, a_index, a_price, style=line.style_dashed, color=my_linecolor, width=2) : na
-        line line_pb = show_pb ? line.new(p_index, p_price, b_index, p_price, style=line.style_dashed, color=my_linecolor, width=2) : na
-        line line_c_op  = show_op  ? line.new(c_time, c_price, d_time,  op_price, style=line_C_style, color=my_linecolor, width=line_C_width, xloc=xloc.bar_time) : na
-        line line_c_cop = show_cop ? line.new(c_time, c_price, d_time, cop_price, style=line_C_style, color=my_linecolor, width=line_C_width, xloc=xloc.bar_time) : na
-        line line_c_xop = show_xop ? line.new(c_time, c_price, d_time, xop_price, style=line_C_style, color=my_linecolor, width=line_C_width, xloc=xloc.bar_time) : na
+    array.set(price_list, OP, op_price)
+    array.set(price_list, COP, cop_price)
+    array.set(price_list, XOP, xop_price)
+    array.set(index_list, D, d_time)
+    array.set(index_list, E, e_time)
 
-        array.set(price_list, OP, op_price)
-        array.set(price_list, COP, cop_price)
-        array.set(price_list, XOP, xop_price)
-        array.set(index_list, D, d_time)
-        
-        draw_labels(index_list, price_list, my_linecolor, should_delete_history, direction)
+    if should_delete_history or not show_history
+        line.delete(line_ab[1])
+        line.delete(line_bc[1])
+        line.delete(line_c_op[1])
+        line.delete(line_c_cop[1])
+        line.delete(line_c_xop[1])
 
-        if (should_delete_history) or not show_history
-            line.delete(line_ab[1])
-            line.delete(line_bc[1])
-            line.delete(line_pa[1])
-            line.delete(line_pb[1])
-            line.delete(line_c_op[1])
-            line.delete(line_c_cop[1])
-            line.delete(line_c_xop[1])
-        
-        if (show_sr)
-            draw_sr(index_list, price_list, my_linecolor, should_delete_history)
-        
-        if (show_fib)
-            draw_fibonacci(index_list, price_list, my_linecolor, should_delete_history)
+    draw_labels(index_list, price_list, my_linecolor, should_delete_history, direction)
 
-        if (show_zone)
-            draw_zone(index_list, price_list, my_linecolor, should_delete_history, direction)
+    draw_past(index_list, price_list, my_linecolor, should_delete_history, direction)
 
-    // Debugger
-    if DEBUG
+    if show_sr
+        draw_sr(index_list, price_list, my_linecolor, should_delete_history)
 
-        msg = ""
-        if a_found
-            msg := msg + EMOJI_V + " A is found.\n"
-        if b_found
-            msg := msg + EMOJI_V + " B is found.\n"
+    if show_fib
+        draw_fibonacci(index_list, price_list, my_linecolor, should_delete_history)
 
-        if (a_found and b_found)
-            msg := msg + (is_valid_ab ? EMOJI_V : EMOJI_X) + " AB\n"
-            msg := msg + (is_valid_bc ? EMOJI_V : EMOJI_X) + " BC\n"
+    if show_zone
+        draw_pullbacks(index_list, price_list, my_linecolor, should_delete_history, direction)
 
-            if not is_valid_ab_ratio
-                msg := msg + EMOJI_X + " AB is too longer\n"
-        
-        if msg != ""
-            label.new(c_index, na, msg, yloc=direction == 1 ? yloc.belowbar : yloc.abovebar, style=direction == 1 ? label.style_label_up : label.style_label_down, textalign=text.align_left)
+ans (valid) => valid ? '◯' : '×'
+
+d (index_list, price_list, found_list, should_be_drawing, direction) => 
+    string[] my_messages = array.new_string()
+    
+    a_price = array.get(price_list, A)
+    b_price = array.get(price_list, B)
+    c_price = array.get(price_list, C)
+    a_index = array.get(index_list, A)
+    b_index = array.get(index_list, B)
+    c_index = array.get(index_list, C)
+    a_found = array.get(found_list, A)
+    b_found = array.get(found_list, B)
+    bc_percent = str.format('{0,number,percent}', math.abs(c_price - b_price) / math.abs(b_price - a_price))
+    ab_div = str.format('{0,number,#.#}', math.abs(a_price - b_price))
+    ab_percent = str.format('{0,number,percent}', math.abs(b_index - a_index) / math.abs(c_index - b_index))
+
+    array.push(my_messages, ans(a_found) + ' ' + (a_found ? "A found" : 'A not found'))
+    array.push(my_messages, ans(b_found) + ' ' + (b_found ? "B found" : 'B not found'))
+    array.push(my_messages, ans(validate_bc(a_price, b_price, c_price)) + ' BC(Ret): ' + bc_percent + ' <= ' + str.format('{0,number,percent}', valid_bc))
+    array.push(my_messages, ans(validate_ab_longer(a_index, b_index, c_index)) + ' AB(Longer):' + ab_percent  + ' < ' + str.format('{0,number,percent}', valid_ab_loger))
+    array.push(my_messages, ans(validate_ab(a_price, b_price)) + ' AB: ' + ab_div + ' >= ' + str.format('{0,number,#.#}', MY_ATR * valid_ab) + '('+ str.tostring(valid_ab)+'ATR)')
+    array.push(my_messages, should_be_drawing ? "It should be drawing" : "Not drawing")
+
+    labelstyle = direction == 1 ? label.style_label_up : label.style_label_down
+    labelcolor = direction == 1 ? color.blue : color.red
+    labelyloc = direction == 1 ? yloc.belowbar : yloc.abovebar
+    label.new(bar_index - rightbar, na, array.join(my_messages, '\n'), yloc=labelyloc, size=size.small, style=labelstyle, color=labelcolor, textalign=text.align_left)
+
 
 ///////////////////
 // Calc
 ///////////////////
-ph = pivothigh(leftbar, rightbar)
-pl = pivotlow(leftbar, rightbar)
+ph = ta.pivothigh(leftbar, rightbar)
+pl = ta.pivotlow(leftbar, rightbar)
 
 start_index = rightbar + TRIGGER_OFFSET
 end_index = lookback
 next_index = 0
+p_lookback_times = 3
 
 current_index = bar_index - rightbar
 counter = 0
 count_max = 20
 should_delete_history = false
+should_be_drawing = false
 
-a_index_not_changed = false
-b_index_not_changed = false
+a_price = 0.0
+b_price = 0.0
+c_price = 0.0
+p_price = 0.0
+a_found = false
+b_found = false
+a_not_changed = false
+b_not_changed = false
+a_index = 0
+b_index = 0
+c_index = 0
+p_index = 0
+p_count = 0
+p_max = 3
 
 var int[] index_bull = array.new_int(10)
 var int[] index_bear = array.new_int(10)
@@ -294,104 +388,157 @@ var float[] price_bull = array.new_float(10, 0)
 var float[] price_bear = array.new_float(10, 0)
 var bool[] found_bull = array.new_bool(5)
 var bool[] found_bear = array.new_bool(5)
+var bool[] flags_bull = array.new_bool(10)
+var bool[] flags_bear = array.new_bool(10)
 
 ///////////////////
 // Plotting
 ///////////////////
-if (pl[TRIGGER_OFFSET] and show_sides != "Bear only")
-    array.set(price_bull, C, low[start_index])
-    array.set(price_bull, B, 0.0)
-    array.set(price_bull, P, 0.0)
-    array.set(found_bull, A, false)
-    array.set(found_bull, B, false)
 
-    for i = start_index to end_index
+// Bull
+// ============
+if pl[TRIGGER_OFFSET] and show_sides != 'Bear only'
+    c_price := low[start_index]
+    messages = array.new_string()
+
+    for i = start_index to end_index by 1
         next_index := i
 
-        if (counter > count_max)
+        if counter > count_max
             break
 
         if pl[i]
-            counter := counter + 1
-            
-            if ((low - a_threshold) > low[i]) and array.get(found_bull, B)
-                array.set(price_bull, A, low[i + rightbar])
-                array.set(index_bull, A, current_index - i)
-                array.set(index_bull, C, bar_index - start_index)
-                array.set(found_bull, A, true)
-                a_index_not_changed := change(array.get(index_bull, A)) == 0
-                is_nearest = (change(array.get(index_bull, C)) < nearest_count)
+            counter += 1
 
-                if (not show_nearest) and is_nearest
+            if low - a_threshold > low[i] and b_found
+                a_price := low[i + rightbar]
+                a_index := current_index - i
+                c_index := bar_index - start_index
+                a_found := true
+                a_not_changed := a_index - array.get(index_bull, A) == 0
+                is_nearest = c_index - array.get(index_bull, C) < nearest_count
+
+                if not show_nearest and is_nearest
                     should_delete_history := true
-                
-                if (nearest_count == 1) and (a_index_not_changed)
+                    should_delete_history
+
+                if nearest_count == 1 and (a_not_changed or b_not_changed)
                     should_delete_history := true
+                    should_delete_history
 
                 break
 
         if ph[i]
-            if (high[i + rightbar] > array.get(price_bull, B)) or array.get(price_bull, B) == 0.0
-                array.set(index_bull, B, current_index - i)
-                array.set(price_bull, B, high[i + rightbar])
-                array.set(found_bull, B, true)
-                b_index_not_changed := change(array.get(index_bull, B)) == 0
+            if high[i + rightbar] > b_price or b_price == 0.0
+                b_index := current_index - i
+                b_price := high[i + rightbar]
+                b_found := true
+                b_not_changed := b_index - array.get(index_bull, B) == 0
+                b_not_changed
 
-    for i = next_index to (next_index * 3)
-        if ph[i]
-            if (high[i + rightbar] > array.get(price_bull, P)) or array.get(price_bull, P) == 0.0
-                array.set(index_bull, P, current_index - i)
-                array.set(price_bull, P, high[i + rightbar])
+    if (a_found and b_found)
+        p_lookback = math.abs(a_index - c_index)
+        for i = next_index to next_index + p_lookback by 1
+            if ph[i]
+                if high[i + rightbar] > p_price or p_price == 0.0
+                    p_index := current_index - i
+                    p_price := high[i + rightbar]
+                    p_count += 1
+                    
+                    if (p_count > p_max)
+                        break
 
-    draw(index_bull, price_bull, found_bull, colorBull, should_delete_history, 1)
+    should_be_drawing := a_found and b_found and validate_bc(a_price, b_price, c_price) and validate_ab(a_price, b_price) and validate_ab_longer(a_index, b_index, c_index)
 
-if (ph[TRIGGER_OFFSET] and show_sides != "Bull only")
-    array.set(price_bear, C, high[start_index])
-    array.set(price_bear, B, 0.0)
-    array.set(price_bear, P, 0.0)
-    array.set(found_bear, A, false)
-    array.set(found_bear, B, false)
-    
-    for i = start_index to end_index
+    array.set(index_bull, A, a_index)
+    array.set(index_bull, B, b_index)
+    array.set(index_bull, C, c_index)
+    array.set(index_bull, P, p_index == 0 ? na : p_index)
+    array.set(price_bull, A, a_price)
+    array.set(price_bull, B, b_price)
+    array.set(price_bull, C, c_price)
+    array.set(price_bull, P, p_price)
+    array.set(flags_bull, A_INDEX_NOT_CHANGED, a_not_changed)
+    array.set(flags_bull, B_INDEX_NOT_CHANGED, b_not_changed)
+    array.set(found_bull, A, a_found)
+    array.set(found_bull, B, b_found)
+
+    if should_be_drawing
+        draw(index_bull, price_bull, found_bull, flags_bull, colorBull, should_delete_history, 1)
+
+    if DEBUG
+        d(index_bull, price_bull, found_bull, should_be_drawing, 1)
+
+if ph[TRIGGER_OFFSET] and show_sides != 'Bull only'
+    c_price := high[start_index]
+
+    for i = start_index to end_index by 1
         next_index := i
 
-        if (counter > count_max)
+        if counter > count_max
             break
-        
-        if (ph[i])
-            counter := counter + 1
-            
-            if ((high + a_threshold) < high[i]) and array.get(found_bear, B)
-                array.set(price_bear, A, high[i + rightbar])
-                array.set(index_bear, A, current_index - i)
-                array.set(index_bear, C, bar_index - start_index)
-                array.set(found_bear, A, true)
-                a_index_not_changed := change(array.get(index_bear, A)) == 0
-                is_nearest = (change(array.get(index_bear, C)) < nearest_count)
 
-                if (not show_nearest) and is_nearest
-                    should_delete_history := true
+        if ph[i]
+            counter += 1
 
-                if (nearest_count == 1) and (a_index_not_changed)
+            if high + a_threshold < high[i] and b_found
+                a_price := high[i + rightbar]
+                a_index := current_index - i
+                c_index := bar_index - start_index
+                a_found := true
+                a_not_changed := a_index - array.get(index_bear, A) == 0
+                is_nearest = c_index - array.get(index_bear, C) < nearest_count
+
+                if not show_nearest and is_nearest
                     should_delete_history := true
+                    should_delete_history
+
+                if nearest_count == 1 and (a_not_changed or b_not_changed)
+                    should_delete_history := true
+                    should_delete_history
 
                 break
-        
-        if (pl[i])
-            if (low[i + rightbar] < array.get(price_bear, B)) or array.get(price_bear, B) == 0.0
-                array.set(index_bear, B, current_index - i)
-                array.set(price_bear, B, low[i + rightbar])
-                array.set(found_bear, B, true)
-                b_index_not_changed := change(array.get(index_bear, B)) == 0
 
-    for i = next_index to (next_index * 3)
         if pl[i]
-            if (low[i + rightbar] < array.get(price_bear, P)) or array.get(price_bear, P) == 0.0
-                array.set(index_bear, P, current_index - i)
-                array.set(price_bear, P, low[i + rightbar])
+            if low[i + rightbar] < b_price or b_price == 0.0
+                b_index := current_index - i
+                b_price := low[i + rightbar]
+                b_found := true
+                b_not_changed := b_index - array.get(index_bear, B) == 0
+                b_not_changed
 
-    draw(index_bear, price_bear, found_bear, colorBear, should_delete_history, -1)
+    if a_found and b_found
+        p_lookback = math.abs(a_index - c_index)
+        for i = next_index to next_index + p_lookback by 1
+            if pl[i]
+                if low[i + rightbar] < p_price or p_price == 0.0
+                    p_index := current_index - i
+                    p_price := low[i + rightbar]
+                    p_count += 1
 
+                    if (p_count > p_max)
+                        break
 
-plotshape(show_pivot and ph, style=shape.labeldown, text="PH", location=location.abovebar, size=size.tiny, color=color.orange, textcolor=color.white, offset=-rightbar)
-plotshape(show_pivot and pl, style=shape.labelup, text="PL", location=location.belowbar, size=size.tiny, color=color.blue, textcolor=color.white, offset=-rightbar)
+    should_be_drawing := a_found and b_found and validate_bc(a_price, b_price, c_price) and validate_ab(a_price, b_price) and validate_ab_longer(a_index, b_index, c_index)
+
+    array.set(index_bear, A, a_index)
+    array.set(index_bear, B, b_index)
+    array.set(index_bear, C, c_index)
+    array.set(index_bear, P, p_index == 0 ? na : p_index)
+    array.set(price_bear, A, a_price)
+    array.set(price_bear, B, b_price)
+    array.set(price_bear, C, c_price)
+    array.set(price_bear, P, p_price)
+    array.set(flags_bear, A_INDEX_NOT_CHANGED, a_not_changed)
+    array.set(flags_bear, B_INDEX_NOT_CHANGED, b_not_changed)
+    array.set(found_bear, A, a_found)
+    array.set(found_bear, B, b_found)
+
+    if should_be_drawing
+        draw(index_bear, price_bear, found_bear, flags_bear, colorBear, should_delete_history, -1)
+
+    if DEBUG
+        d(index_bear, price_bear, found_bear, should_be_drawing, -1)
+
+plotshape(show_pivot and ph, style=shape.labeldown, text='PH', location=location.abovebar, size=size.tiny, color=color.new(color.orange, 0), textcolor=color.new(color.white, 0), offset=-rightbar)
+plotshape(show_pivot and pl, style=shape.labelup, text='PL', location=location.belowbar, size=size.tiny, color=color.new(color.blue, 0), textcolor=color.new(color.white, 0), offset=-rightbar)
